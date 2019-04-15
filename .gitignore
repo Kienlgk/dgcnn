@@ -50,7 +50,11 @@ gradleBuild
 **/*.meta
 **/*.index
 **/*.data-*
+# Data ignore
 data/
+data
+**/hdf5_data
+**/indoor3d_sem_seg_hdf5_data
 data_download/
 **/hdf5_data/
 **/PartAnnotation/
