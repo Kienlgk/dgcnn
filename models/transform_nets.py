@@ -15,29 +15,42 @@ def input_transform_net(edge_feature, is_training, bn_decay=None, K=3, is_dist=F
   num_point = edge_feature.get_shape()[1].value
 
   # input_image = tf.expand_dims(point_cloud, -1)
+  print(edge_feature)
   net = tf_util.conv2d(edge_feature, 64, [1,1],
              padding='VALID', stride=[1,1],
              bn=True, is_training=is_training,
              scope='tconv1', bn_decay=bn_decay, is_dist=is_dist)
+  print(net)
   net = tf_util.conv2d(net, 128, [1,1],
              padding='VALID', stride=[1,1],
              bn=True, is_training=is_training,
              scope='tconv2', bn_decay=bn_decay, is_dist=is_dist)
+  print(net)
   
   net = tf.reduce_max(net, axis=-2, keep_dims=True)
+  print(net)
   
   net = tf_util.conv2d(net, 1024, [1,1],
              padding='VALID', stride=[1,1],
              bn=True, is_training=is_training,
              scope='tconv3', bn_decay=bn_decay, is_dist=is_dist)
+  print(net)
+
   net = tf_util.max_pool2d(net, [num_point,1],
                padding='VALID', scope='tmaxpool')
+  print(net)
+
 
   net = tf.reshape(net, [batch_size, -1])
+  print(net)
+
   net = tf_util.fully_connected(net, 512, bn=True, is_training=is_training,
                   scope='tfc1', bn_decay=bn_decay,is_dist=is_dist)
+  print(net)
+
   net = tf_util.fully_connected(net, 256, bn=True, is_training=is_training,
                   scope='tfc2', bn_decay=bn_decay,is_dist=is_dist)
+  print(net)
 
   with tf.variable_scope('transform_XYZ') as sc:
     # assert(K==3)

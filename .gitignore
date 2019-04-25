@@ -46,6 +46,8 @@ gradleBuild
 # Project files
 **/*.zip
 **/*.h5
+**/*.npy
+**/*.npz
 **/events.out.tfevents.*
 **/*.meta
 **/*.index
@@ -63,5 +65,6 @@ part_seg/train.py
 log/checkpoint
 log/log_train.txt
 sample_scripts
-**/log/
+log/
 **/train_results/
+sem_seg/*log*/

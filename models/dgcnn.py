@@ -30,8 +30,12 @@ def get_model(point_cloud, is_training, bn_decay=None):
 
   with tf.variable_scope('transform_net1') as sc:
     transform = input_transform_net(edge_feature, is_training, bn_decay, K=3)
+  print(point_cloud.shape) #(32, 1024, 3)
+  print(transform.shape)   #(32, 3, 3)
 
   point_cloud_transformed = tf.matmul(point_cloud, transform)
+  print(point_cloud_transformed.shape) #(32, 1024, 3)
+  exit()
   adj_matrix = tf_util.pairwise_distance(point_cloud_transformed)
   nn_idx = tf_util.knn(adj_matrix, k=k)
   edge_feature = tf_util.get_edge_feature(point_cloud_transformed, nn_idx=nn_idx, k=k)
@@ -131,11 +135,11 @@ if __name__=='__main__':
       sess.run(tf.global_variables_initializer())
       feed_dict = {input_pl: input_feed, label_pl: label_feed}
       res1, res2 = sess.run([pos, ftr], feed_dict=feed_dict)
-      print res1.shape
-      print res1
+      print(res1.shape)
+      print(res1) 
 
-      print res2.shape
-      print res2
+      print(res2.shape) 
+      print(res2) 
 
 
 

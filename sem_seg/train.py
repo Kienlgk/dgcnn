@@ -61,19 +61,18 @@ HOSTNAME = socket.gethostname()
 
 ALL_FILES = provider.getDataFiles('indoor3d_sem_seg_hdf5_data/all_files.txt') 
 room_filelist = [line.rstrip() for line in open('indoor3d_sem_seg_hdf5_data/room_filelist.txt')] 
-print len(room_filelist)
+print(len(room_filelist))
 
 # Load ALL data
 data_batch_list = []
 label_batch_list = []
-for h5_filename in ALL_FILES:
-  data_batch, label_batch = provider.loadDataFile(h5_filename)
-  data_batch_list.append(data_batch)
-  label_batch_list.append(label_batch)
+for file_idx, h5_filename in enumerate(ALL_FILES):
+    data_batch, label_batch = provider.loadDataFile(h5_filename)
+    data_batch_list.append(data_batch)
+    label_batch_list.append(label_batch)
+
 data_batches = np.concatenate(data_batch_list, 0)
 label_batches = np.concatenate(label_batch_list, 0)
-print(data_batches.shape)
-print(label_batches.shape)
 
 test_area = 'Area_'+str(FLAGS.test_area)
 train_idxs = []
@@ -90,8 +89,8 @@ test_data = data_batches[test_idxs,...]
 test_label = label_batches[test_idxs]
 print(train_data.shape, train_label.shape)
 print(test_data.shape, test_label.shape)
-
-
+import time
+# time.sleep(100)
 def log_string(out_str):
   LOG_FOUT.write(out_str+'\n')
   LOG_FOUT.flush()
@@ -170,7 +169,7 @@ def train():
     is_training_phs =[]
 
     with tf.variable_scope(tf.get_variable_scope()):
-      for i in xrange(FLAGS.num_gpu):
+      for i in range(FLAGS.num_gpu):
         with tf.device('/gpu:%d' % i):
           with tf.name_scope('%s_%d' % (TOWER_NAME, i)) as scope:
       
@@ -181,7 +180,7 @@ def train():
             labels_phs.append(labels_pl)
             is_training_phs.append(is_training_pl)
       
-            pred = get_model(pointclouds_phs[-1], is_training_phs[-1], bn_decay=bn_decay)
+            pred = get_light_model(pointclouds_phs[-1], is_training_phs[-1], bn_decay=bn_decay)
             loss = get_loss(pred, labels_phs[-1])
             tf.summary.scalar('loss', loss)
 
@@ -234,7 +233,7 @@ def train():
       train_one_epoch(sess, ops, train_writer)
       
       # Save the variables to disk.
-      if epoch % 10 == 0:
+      if epoch % 1 == 0:
         save_path = saver.save(sess, os.path.join(LOG_DIR,'epoch_' + str(epoch)+'.ckpt'))
         log_string("Model saved in file: %s" % save_path)
 
