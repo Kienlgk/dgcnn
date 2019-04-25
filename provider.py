@@ -9,12 +9,12 @@ sys.path.append(BASE_DIR)
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 if not os.path.exists(DATA_DIR):
   os.mkdir(DATA_DIR)
-if not os.path.exists(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048')):
-  www = 'https://shapenet.cs.stanford.edu/media/modelnet40_ply_hdf5_2048.zip'
-  zipfile = os.path.basename(www)
-  os.system('wget %s; unzip %s' % (www, zipfile))
-  os.system('mv %s %s' % (zipfile[:-4], DATA_DIR))
-  os.system('rm %s' % (zipfile))
+# if not os.path.exists(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048')):
+#   www = 'https://shapenet.cs.stanford.edu/media/modelnet40_ply_hdf5_2048.zip'
+#   zipfile = os.path.basename(www)
+#   os.system('wget %s; unzip %s' % (www, zipfile))
+#   os.system('mv %s %s' % (zipfile[:-4], DATA_DIR))
+#   os.system('rm %s' % (zipfile))
 
 
 def shuffle_data(data, labels):
@@ -28,6 +28,40 @@ def shuffle_data(data, labels):
   idx = np.arange(len(labels))
   np.random.shuffle(idx)
   return data[idx, ...], labels[idx], idx
+
+
+
+def shuffle_data_indices(indices):
+  """ Shuffle indices
+    Input:
+      indices: 1D array which is list of indice
+    Return:
+      shuffled indices 1D array
+  """
+  idx = np.arange(len(indices))
+  np.random.shuffle(idx)
+  return np.asarray(indices)[idx, ...], idx
+
+
+def load_npy_data_from_indices(indices, data_dir, label_dir):
+  """ Load .npy files in to np array
+    Input:
+      indices 1D array which is shuffled
+    Return:
+      data: B,N,... numpy array
+      label: B,... numpy array 
+  """
+  filenames = [str(indice).zfill(6)+".npy" for indice in indices]
+  data_list = []
+  label_list = []
+  for filename in filenames:
+    data_path = os.path.join(data_dir, filename)
+    label_path = os.path.join(label_dir, filename)
+    data = np.load(data_path)
+    label = np.load(label_path)
+    data_list.append(data)
+    label_list.append(label)
+  return np.asarray(data_list), np.asarray(label_list)
 
 
 def rotate_point_cloud(batch_data):
@@ -136,14 +170,25 @@ def random_scale_point_cloud(batch_data, scale_low=0.8, scale_high=1.25):
     batch_data[batch_index,:,:] *= scales[batch_index]
   return batch_data
 
+
 def getDataFiles(list_filename):
   return [line.rstrip() for line in open(list_filename)]
+
+
+def getDataFilesPath(data_files, data_dir):
+    """data_files is get from getDataFiles func
+    """
+    data_parent_dir = os.path.join(*(os.path.split(data_dir)[:-1]))
+    return [os.path.join(data_parent_dir, _file) for _file in data_files
+            if os.path.exists(os.path.join(data_parent_dir, _file))]
+
 
 def load_h5(h5_filename):
   f = h5py.File(h5_filename)
   data = f['data'][:]
   label = f['label'][:]
   return (data, label)
+
 
 def loadDataFile(filename):
   return load_h5(filename)

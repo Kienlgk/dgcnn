@@ -31,7 +31,7 @@ def main(args):
         pass
         # os.
     ALL_FILES = provider.getDataFiles(os.path.join(data_dir, 'all_files.txt'))
-    ALL_FILES = resolve_all_files_path(ALL_FILES, data_dir)
+    ALL_FILES = provider.getDataFilesPath(ALL_FILES, data_dir)
     room_filelist = [line.rstrip() for line in open(os.path.join(data_dir, 'room_filelist.txt'))]
 
     data_batch_list = []
@@ -54,10 +54,6 @@ def main(args):
             np.save(os.path.join(out_label_dir, filename), label_batch[batch_indices])
         pointcloud_indices += h5_batch_size
 
-def resolve_all_files_path(all_files, data_dir):
-    data_parent_dir = os.path.join(*(os.path.split(data_dir)[:-1]))
-    return [os.path.join(data_parent_dir, _file) for _file in all_files 
-            if os.path.exists(os.path.join(data_parent_dir, _file))]
 
 def arguments_parser(argv):
     parser = argparse.ArgumentParser()

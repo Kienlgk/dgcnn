@@ -4,6 +4,7 @@ import h5py
 import numpy as np
 import tensorflow as tf
 import socket
+import random
 
 import os
 import sys
@@ -17,7 +18,10 @@ import tf_util
 from model import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--num_gpu', type=int, default=2, help='the number of GPUs to use [default: 2]')
+parser.add_argument('--data_dir', default='indoor3d_sem_seg_hdf5_data_npy', help='data_npy folder' )
+parser.add_argument('--sub_data_dir', default='data', help='data folder, is subfolder of data_dir' )
+parser.add_argument('--sub_label_dir', default='label', help='label_folder folder, is subfolder of data_dir' )
+parser.add_argument('--num_gpu', type=int, default=1, help='the number of GPUs to use [default: 2]')
 parser.add_argument('--log_dir', default='log', help='Log dir [default: log]')
 parser.add_argument('--num_point', type=int, default=4096, help='Point number [default: 4096]')
 parser.add_argument('--max_epoch', type=int, default=101, help='Epoch to run [default: 50]')
@@ -28,6 +32,7 @@ parser.add_argument('--optimizer', default='adam', help='adam or momentum [defau
 parser.add_argument('--decay_step', type=int, default=300000, help='Decay step for lr decay [default: 300000]')
 parser.add_argument('--decay_rate', type=float, default=0.5, help='Decay rate for lr decay [default: 0.5]')
 parser.add_argument('--test_area', type=int, default=6, help='Which area to use for test, option: 1-6 [default: 6]')
+parser.add_argument('--seed', type=int, default=19, help='seed for reproducing results')
 FLAGS = parser.parse_args()
 
 TOWER_NAME = 'tower'
@@ -41,13 +46,22 @@ MOMENTUM = FLAGS.momentum
 OPTIMIZER = FLAGS.optimizer
 DECAY_STEP = FLAGS.decay_step
 DECAY_RATE = FLAGS.decay_rate
-
+SEED = FLAGS.seed
 LOG_DIR = FLAGS.log_dir
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
 os.system('cp model.py %s' % (LOG_DIR)) 
 os.system('cp train.py %s' % (LOG_DIR)) 
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
 LOG_FOUT.write(str(FLAGS)+'\n')
+
+DATA_DIR = os.path.join(BASE_DIR, FLAGS.data_dir, FLAGS.sub_data_dir)
+LABEL_DIR = os.path.join(BASE_DIR, FLAGS.data_dir, FLAGS.sub_label_dir)
+assert os.path.exists(DATA_DIR), "{} not found".format(DATA_DIR)
+assert os.path.exists(LABEL_DIR), "{} not found".format(LABEL_DIR)
+
+np.random.seed(SEED)
+random.seed(SEED)
+
 
 MAX_NUM_POINT = 4096
 NUM_CLASSES = 13
@@ -59,10 +73,12 @@ BN_DECAY_CLIP = 0.99
 
 HOSTNAME = socket.gethostname()
 
-ALL_FILES = provider.getDataFiles('indoor3d_sem_seg_hdf5_data/all_files.txt') 
-room_filelist = [line.rstrip() for line in open('indoor3d_sem_seg_hdf5_data/room_filelist.txt')] 
+# ALL_FILES = provider.getDataFiles('indoor3d_sem_seg_hdf5_data/all_files.txt') 
+# room_filelist = [line.rstrip() for line in open('indoor3d_sem_seg_hdf5_data/room_filelist.txt')]
+room_filelist = [line.rstrip() for line in open(os.path.join(os.path.dirname(DATA_DIR), 'room_filelist.txt'))]
 print(len(room_filelist))
 
+"""
 # Load ALL data
 data_batch_list = []
 label_batch_list = []
@@ -73,6 +89,7 @@ for file_idx, h5_filename in enumerate(ALL_FILES):
 
 data_batches = np.concatenate(data_batch_list, 0)
 label_batches = np.concatenate(label_batch_list, 0)
+"""
 
 test_area = 'Area_'+str(FLAGS.test_area)
 train_idxs = []
@@ -83,12 +100,16 @@ for i,room_name in enumerate(room_filelist):
   else:
     train_idxs.append(i)
 
+"""
 train_data = data_batches[train_idxs,...]
 train_label = label_batches[train_idxs]
 test_data = data_batches[test_idxs,...]
 test_label = label_batches[test_idxs]
+
 print(train_data.shape, train_label.shape)
 print(test_data.shape, test_label.shape)
+"""
+
 import time
 # time.sleep(100)
 def log_string(out_str):
@@ -153,6 +174,7 @@ def average_gradients(tower_grads):
 
 def train():
   with tf.Graph().as_default(), tf.device('/cpu:0'):
+    tf.set_random_seed(SEED)
     batch = tf.Variable(0, trainable=False)
     
     bn_decay = get_bn_decay(batch)
@@ -244,9 +266,12 @@ def train_one_epoch(sess, ops, train_writer):
   is_training = True
   
   log_string('----')
-  current_data, current_label, _ = provider.shuffle_data(train_data[:,0:NUM_POINT,:], train_label) 
+  # current_data, current_label, _ = provider.shuffle_data(train_data[:,0:NUM_POINT,:], train_label)
+  all_indices, _ = provider.shuffle_data_indices(train_idxs) 
+  # current_data, current_label = provider.load_npy_data_from_indices(DATA_DIR, LABEL_DIR)
   
-  file_size = current_data.shape[0]
+  # file_size = current_data.shape[0]
+  file_size = all_indices.shape[0]
   num_batches = file_size // (FLAGS.num_gpu * BATCH_SIZE) 
   
   total_correct = 0
@@ -262,17 +287,30 @@ def train_one_epoch(sess, ops, train_writer):
     end_idx_1 = (batch_idx+2) * BATCH_SIZE
     
     
-    feed_dict = {ops['pointclouds_phs'][0]: current_data[start_idx_0:end_idx_0, :, :],
-                 ops['pointclouds_phs'][1]: current_data[start_idx_1:end_idx_1, :, :],
-                 ops['labels_phs'][0]: current_label[start_idx_0:end_idx_0],
-                 ops['labels_phs'][1]: current_label[start_idx_1:end_idx_1],
-                 ops['is_training_phs'][0]: is_training,
-                 ops['is_training_phs'][1]: is_training}
+    # feed_dict = {ops['pointclouds_phs'][0]: current_data[start_idx_0:end_idx_0, :, :],
+    #              ops['pointclouds_phs'][1]: current_data[start_idx_1:end_idx_1, :, :],
+    #              ops['labels_phs'][0]: current_label[start_idx_0:end_idx_0],
+    #              ops['labels_phs'][1]: current_label[start_idx_1:end_idx_1],
+    #              ops['is_training_phs'][0]: is_training,
+    #              ops['is_training_phs'][1]: is_training}
+    current_data_0, current_label_0 = provider.load_npy_data_from_indices(all_indices[start_idx_0:end_idx_0], DATA_DIR, LABEL_DIR)
+    # current_data_1, current_label_1 = provider.load_npy_data_from_indices(all_indices[start_idx_1:end_idx_1], DATA_DIR, LABEL_DIR)
+    # feed_dict = {ops['pointclouds_phs'][0]: current_data_0,
+    #              ops['pointclouds_phs'][1]: current_data_1,
+    #              ops['labels_phs'][0]: current_label_0,
+    #              ops['labels_phs'][1]: current_label_1,
+    #              ops['is_training_phs'][0]: is_training,
+    #              ops['is_training_phs'][1]: is_training}
+    feed_dict = {ops['pointclouds_phs'][0]: current_data_0,
+                 ops['labels_phs'][0]: current_label_0,
+                 ops['is_training_phs'][0]: is_training}
     summary, step, _, loss_val, pred_val = sess.run([ops['merged'], ops['step'], ops['train_op'], ops['loss'], ops['pred']],
                      feed_dict=feed_dict)
     train_writer.add_summary(summary, step)
     pred_val = np.argmax(pred_val, 2)
-    correct = np.sum(pred_val == current_label[start_idx_1:end_idx_1])
+    # correct = np.sum(pred_val == current_label[start_idx_1:end_idx_1])
+    correct = np.sum(pred_val == current_label_0)
+
     total_correct += correct
     total_seen += (BATCH_SIZE*NUM_POINT)
     loss_sum += loss_val
